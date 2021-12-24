@@ -1,13 +1,12 @@
-# Streamlit Demo: The Udacity Self-driving Car Image Browser
+# Self-driving Assistance System
 
-This project demonstrates the [Udacity self-driving-car dataset](https://github.com/udacity/self-driving-car) and [YOLO object detection](https://pjreddie.com/darknet/yolo) into an interactive [Streamlit](https://streamlit.io) app.
+Hi there! Welcome to our project.
 
-The complete demo is [implemented in less than 300 lines of Python](https://github.com/streamlit/demo-self-driving/blob/master/streamlit_app.py) and illustrates all the major building blocks of Streamlit.
+This website is maintained by *Qitao* *Zhao*.
 
 👈 **Please select _Run the App_ in the sidebar to start.**
 
 ### Questions? Comments?
 
 Please ask in the [Streamlit community](https://discuss.streamlit.io).
-
 
