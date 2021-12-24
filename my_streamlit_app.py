@@ -39,7 +39,7 @@ def main():
         st.sidebar.success('To continue select "Run the app".')
     elif app_mode == "Show the source code":
         readme_text.empty()
-        st.code(get_file_content_as_string("streamlit_app.py"))
+        st.code(get_file_content_as_string("my_streamlit_app.py"))
     elif app_mode == "Run the app":
         readme_text.empty()
         run_the_app()
@@ -198,7 +198,7 @@ def draw_image_with_boxes(image, boxes, header, description):
 # Download a single file and make its content available as a string.
 @st.cache(show_spinner=False)
 def get_file_content_as_string(path):
-    url = 'https://raw.githubusercontent.com/streamlit/demo-self-driving/master/' + path
+    url = 'https://github.com/QitaoZhao/Car-Detection/blob/my-branch/' + path
     response = urllib.request.urlopen(url)
     return response.read().decode("utf-8")
 
