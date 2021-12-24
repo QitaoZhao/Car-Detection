@@ -198,7 +198,7 @@ def draw_image_with_boxes(image, boxes, header, description):
 # Download a single file and make its content available as a string.
 @st.cache(show_spinner=False)
 def get_file_content_as_string(path):
-    url = 'https://github.com/QitaoZhao/Car-Detection/blob/my-branch/' + path
+    url = 'https://raw.githubusercontent.com/QitaoZhao/Car-Detection/my-branch/' + path # Use raw content
     response = urllib.request.urlopen(url)
     return response.read().decode("utf-8")
 
