@@ -8,5 +8,5 @@ This website is maintained by *Qitao* *Zhao*.
 
 ### Questions? Comments?
 
-Please ask in the [Streamlit community](https://discuss.streamlit.io).
+**Feel free to access my GitHub https://github.com/QitaoZhao/Car-Detection for more details!**
 
