@@ -4,3 +4,4 @@ __pycache__/
 yolov3.weights
 yolov3.cfg
 *.mp4
+demo.py

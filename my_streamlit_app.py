@@ -31,7 +31,7 @@ def main():
 		 page_title="Ex-stream-ly Cool App",
 		 page_icon="🧊",
 		 layout="wide",
-		 initial_sidebar_state="expanded",
+		 initial_sidebar_state="collapsed", # "auto" or "expanded" or "collapsed"
 		 menu_items={
 			 'Get Help': 'https://www.extremelycoolapp.com/help',
 			 'Report a bug': "https://www.extremelycoolapp.com/bug",
@@ -162,7 +162,7 @@ def run_the_app():
 
 	cap = cv2.VideoCapture(video_path)
 
-	st.subheader("System Infomation")
+	st.subheader("System Information")
 	st.markdown("System info monitoring.")
 	metrics = st.empty()
 	col1, col2, col3 = metrics.columns(3)
@@ -170,7 +170,7 @@ def run_the_app():
 	col2.metric("Wind", "9 mph", "-8%")
 	col3.metric("Humidity", "86%", "4%")
 	st.subheader("Road Image")
-	st.markdown("Real-time car-detection and driving assistance.")
+	st.markdown("Real-time car-detection with road conditions under recording.")
 	placeholder = st.empty()
 	st.sidebar.markdown("# Frame")
 	side_bar = st.sidebar.empty()
@@ -200,6 +200,7 @@ def run_the_app():
     	columns=['car', 'person', 'bike'])
 
 	st.subheader("Statistics")
+	st.markdown("Something may useful.")
 	st.line_chart(chart_data, width=260, height=250)
 
 	if "cap" not in st.session_state:
