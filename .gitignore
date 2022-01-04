@@ -4,5 +4,7 @@ __pycache__/
 yolov3.weights
 yolov3.cfg
 *.mp4
+*.jpg
 demo.py
+streamlit_app.py
 .DS_Store

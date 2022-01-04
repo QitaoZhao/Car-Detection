@@ -1,62 +1,76 @@
 import streamlit as st
-import time
-import pandas as pd
-import numpy as np
-import pydeck as pdk
+import folium
+from streamlit_folium import folium_static
+st.set_page_config(page_title="网页地图应用", layout="centered")
+my_map= folium.Map(location=[31.23374, 121.46819],zoom_start=20, tiles="Stamen Terrain")
+basemaps = {
+    'Google Maps': folium.TileLayer(
+        tiles = 'https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',
+        attr = 'Google',
+        name = 'Google Maps',
+        overlay = True,
+        control = True
+    ),
+    'Google Satellite': folium.TileLayer(
+        tiles = 'https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
+        attr = 'Google',
+        name = 'Google Satellite',
+        overlay = True,
+        control = True
+    ),
+    'Google Terrain': folium.TileLayer(
+        tiles = 'https://mt1.google.com/vt/lyrs=p&x={x}&y={y}&z={z}',
+        attr = 'Google',
+        name = 'Google Terrain',
+        overlay = True,
+        control = True
+    ),
+    'Google Satellite Hybrid': folium.TileLayer(
+        tiles = 'https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}',
+        attr = 'Google',
+        name = 'Google Satellite',
+        overlay = True,
+        control = True
+    ),
+    'Esri Satellite': folium.TileLayer(
+        tiles = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+        attr = 'Esri',
+        name = 'Esri Satellite',
+        overlay = True,
+        control = True
+    ),
+    '腾讯地图': folium.TileLayer(
+        tiles = 'http://rt0.map.gtimg.com/realtimerender?z={z}&x={x}&y={-y}&type=vector&style=0',
+        attr = '腾讯地图',
+        name = '腾讯地图',
+        overlay = True,
+        control = True
+    ),
+    '高德卫星地图': folium.TileLayer(
+        tiles = 'https://webst01.is.autonavi.com/appmaptile?style=6&x={x}&y={y}&z={z}',
+        attr = '高德卫星地图',
+        name = '高德卫星地图',
+        overlay = True,
+        control = True
+    )
 
-if "celsius" not in st.session_state:
-    # set the initial default value of the slider widget
-    st.session_state.celsius = 50.0
+}
 
-st.slider(
-    "Temperature in Celsius",
-    min_value=-100.0,
-    max_value=100.0,
-    key="celsius"
-)
+map_select=st.selectbox("请选择一个要查看的地图类型",("Esri Satellite","高德卫星地图","腾讯地图"))
+basemaps[map_select].add_to(my_map)
 
-# This will get the value of the slider widget
-st.write(st.session_state.celsius)
+folium.Marker([45.3288, -121.6625], popup="<i>Mt. Hood Meadows</i>").add_to(my_map)
 
-my_bar = st.progress(0)
+folium_static(my_map)
 
-with st.spinner('Wait for it...'):
-    for percent_complete in range(100):
-        time.sleep(0.05)
-        my_bar.progress(percent_complete + 1)
 
-my_bar.empty()
-good = st.progress(0)
+st.info("地图标记")
+lon = st.text_input("请输入要标记点的经度", value="121.46819")
+lat = st.text_input("请输入要标记点的纬度", value="31.23374")
 
-df = pd.DataFrame(
-    np.random.randn(1000, 2) / [50, 50] + [36.37344, 120.68088],
-    columns=['lat', 'lon'])
+m = folium.Map(location=[lat, lon], zoom_start=20, tiles="Stamen Terrain")
 
-st.pydeck_chart(pdk.Deck(
-     map_style='mapbox://styles/mapbox/light-v9',
-     initial_view_state=pdk.ViewState(
-         latitude=36.37344,
-         longitude=120.68088,
-         zoom=11,
-         pitch=50,
-     ),
-     layers=[
-         pdk.Layer(
-            'HexagonLayer',
-            data=df,
-            get_position='[lon, lat]',
-            radius=200,
-            elevation_scale=4,
-            elevation_range=[0, 1000],
-            pickable=True,
-            extruded=True,
-         ),
-         pdk.Layer(
-             'ScatterplotLayer',
-             data=df,
-             get_position='[lon, lat]',
-             get_color='[200, 30, 0, 160]',
-             get_radius=200,
-         ),
-     ],
- ))
+tooltip = "我在这里!"
+folium.Marker([lat, lon], popup="<i>Mt. Hood Meadows</i>", tooltip=tooltip, icon=folium.Icon(color="red",icon="cloud")).add_to(m)
+
+folium_static(m)

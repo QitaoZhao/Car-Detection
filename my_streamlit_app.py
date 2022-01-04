@@ -20,7 +20,11 @@ import streamlit as st
 import altair as alt
 import pandas as pd
 import numpy as np
-import os, urllib, cv2
+import pydeck as pdk
+from datetime import datetime, timedelta
+from streamlit_echarts import st_echarts
+import os, urllib, cv2, psutil, time, pyowm
+from utils import get_loc
 
 video_path = "test.mp4"
 frames = []
@@ -99,24 +103,23 @@ def download_file(file_path):
 
 # This is the main app app itself, which appears when the user selects "Run the app".
 def run_the_app():
-	# To make Streamlit fast, st.cache allows us to reuse computation across runs.
-	# In this common pattern, we download data from an endpoint only once.
-	@st.cache
-	def load_metadata(url):
-		return pd.read_csv(url)
 
-	# This function uses some Pandas magic to summarize the metadata Dataframe.
-	@st.cache
-	def create_summary(metadata):
-		one_hot_encoded = pd.get_dummies(metadata[["frame", "label"]], columns=["label"])
-		summary = one_hot_encoded.groupby(["frame"]).sum().rename(columns={
-			"label_biker": "biker",
-			"label_car": "car",
-			"label_pedestrian": "pedestrian",
-			"label_trafficLight": "traffic light",
-			"label_truck": "truck"
-		})
-		return summary
+	def show_weather_data():
+		place = "Qingdao"
+		unit_c = 'celsius'
+		weather = st.session_state.weather
+		temperature = weather.temperature(unit='celsius')['temp']
+
+		GMT_FORMAT = '%Y-%m-%d %H:%M:%S+00:00'
+		st.sidebar.title(f"📍 Weather at {place[0].upper()+place[1:]} currently: ")
+		if unit_c == 'celsius':
+			st.sidebar.write(f"### 🌡️ Temperature: {temperature} °C")
+		else:
+			st.sidebar.write(f"### 🌡️ Temperature: {temperature} F")
+		st.sidebar.write(f"### ☁️ Sky: {weather.detailed_status[0].upper()+weather.detailed_status[1:]}")
+		st.sidebar.write(f"### 🌪 Wind Speed: {round(weather.wind(unit='km_hour')['speed'])} km/h")
+		st.sidebar.write(f"### 🌅 Sunrise Time :     {datetime.strptime(weather.sunrise_time(timeformat='iso'), GMT_FORMAT)+timedelta(hours=8)}")
+		st.sidebar.write(f"### 🌇 Sunset Time :      {datetime.strptime(weather.sunset_time(timeformat='iso'), GMT_FORMAT)+timedelta(hours=8)}")
 
 	# @st.experimental_memo # It may accelerate the process	
 	def save_frame(frame):
@@ -132,21 +135,139 @@ def run_the_app():
 		else:
 			st.session_state.stop = True
 
-	# Update system infomation
-	def update_sys_info(metrics):
-		metrics.empty()
-		col1, col2, col3 = metrics.columns(3)
-		col1.metric("Temperature", "70 °F", "1.2 °F")
-		col2.metric("Wind", "9 mph", "-8%")
-		col3.metric("Humidity", "86%", "4%")
+	# Fetch system infomation
+	def get_sys_info(sys_info):
+		cpu_percent = psutil.cpu_percent(1)
+		sys_info.append(cpu_percent)
+		disk = psutil.disk_usage('/')
+		disk_usage = disk.used / disk.total 
+		sys_info.append(round(100*disk_usage,1))
+		mem = psutil.virtual_memory()
+		mem_usage = mem.used / mem.total
+		sys_info.append(round(100*mem_usage,1))
 
-	if "rerun" not in st.session_state:
+	def draw_gauges(columns):
+		def show_gauge(value, label):
+			option = {
+				"tooltip": {
+					"formatter": '{a} <br/>{b} : {c}%',
+				},
+				"series": [{
+					"name": '进度',
+					"type": 'gauge',
+					"startAngle": 0,
+					"endAngle": 360,
+					"progress": {
+						"show": "true"
+					},
+					"radius":'100%', 
+					"itemStyle": {
+						# "color": '#58D9F9',
+						"color": '#D23D3B',
+						"shadowColor": 'rgba(206,104,104,0.45)',
+						"shadowBlur": 10,
+						"shadowOffsetX": 2,
+						"shadowOffsetY": 2,
+						"radius": '55%',
+					},
+					"progress": {
+						"show": "true",
+						"roundCap": "true",
+						"width": 15
+					},
+					"pointer": {
+						"length": '60%',
+						"width": 8,
+						"offsetCenter": [0, '5%']
+					},
+					"detail": {
+						"valueAnimation": "true",
+						"formatter": '{value}%',
+						"color": '#FAFAFA',
+						"backgroundColor": '#262730',
+						"fontSize": 20,
+						"borderColor": '#999',
+						"borderWidth": 4,
+						"width": '60%',
+						"lineHeight": 10,
+						"height": 10,
+						"bottom": "0%",
+						"borderRadius": 188,
+						"offsetCenter": [0, '40%'],
+					},
+					"data": [{
+						"value": value,
+						"name": label,
+					}]
+				}]
+			};
+			st_echarts(options=option)
+
+		col1, col2, col3 = columns
+		with col1:
+			show_gauge(st.session_state.sys_info[0], "CPU Usage")
+		with col2:
+			show_gauge(st.session_state.sys_info[1], "Disk Usage")
+		with col3:
+			show_gauge(st.session_state.sys_info[2], "Memory Usage")
+
+	def draw_map(road_map, my_loc):
+		# lat, lon = my_loc
+		img = cv2.imread("./map.jpg")
+		road_map.image(img, caption=None, width=None, use_column_width=True, clamp=False, channels="RGB", output_format="auto")
+		# df = pd.DataFrame(
+		#     np.random.randn(1000, 2) / [50, 50] + my_loc,
+		#     columns=['lat', 'lon'])
+
+		# road_map.pydeck_chart(pdk.Deck(
+		#      map_style='mapbox://styles/mapbox/light-v9',
+		#      initial_view_state=pdk.ViewState(
+		#          latitude=lat,
+		#          longitude=lon,
+		#          zoom=11,
+		#          pitch=50,
+		#          height=394,
+		#      ),
+		#      layers=[
+		#          pdk.Layer(
+		#             'HexagonLayer',
+		#             data=df,
+		#             get_position='[lon, lat]',
+		#             radius=200,
+		#             elevation_scale=4,
+		#             elevation_range=[0, 1000],
+		#             pickable=True,
+		#             extruded=True,
+		#          ),
+		#          pdk.Layer(
+		#              'ScatterplotLayer',
+		#              data=df,
+		#              get_position='[lon, lat]',
+		#              get_color='[200, 30, 0, 160]',
+		#              get_radius=200,
+		#          ),
+		#      ],
+		#  ))
+
+	if "first_time" not in st.session_state:
 	# set the initial default value of the slider widget
-		st.session_state.rerun = True
+		st.session_state.first_time = True
+
+	if "sys_info" not in st.session_state:
+	# Store the system information
+		st.session_state.sys_info = []
 
 	if "slider" not in st.session_state:
 	# set the initial default value of the slider widget
 		st.session_state.slider = 60
+
+	if "my_loc" not in st.session_state:
+	# set the initial default value of the slider widget
+		st.session_state.my_loc = None
+
+	if "weather" not in st.session_state:
+	# set the initial default value of the slider widget
+		st.session_state.weather = None
 
 	if "stop" not in st.session_state:
 		st.session_state.stop = False
@@ -154,54 +275,75 @@ def run_the_app():
 	if "frames" not in st.session_state:
 		st.session_state.frames = frames
 
-	# An amazing property of st.cached functions is that you can pipe them into
-	# one another to form a computation DAG (directed acyclic graph). Streamlit
-	# recomputes only whatever subset is required to get the right answer!
-	metadata = load_metadata(os.path.join(DATA_URL_ROOT, "labels.csv.gz"))
-	summary = create_summary(metadata)
-
 	cap = cv2.VideoCapture(video_path)
+	st.subheader("System Information Monitoring 🚗")
+	gauges = st.empty()
+	col1, col2, col3 = gauges.columns(3)
+	st.subheader("Road Map with Real-time Car-detection 🚦")
+	images = st.empty()
+	col_1, col_2 = images.columns([5,5])
+	road_map = col_1.empty()
+	road_image = col_2.empty()
 
-	st.subheader("System Information")
-	st.markdown("System info monitoring.")
-	metrics = st.empty()
-	col1, col2, col3 = metrics.columns(3)
-	col1.metric("Temperature", "70 °F", "1.2 °F")
-	col2.metric("Wind", "9 mph", "-8%")
-	col3.metric("Humidity", "86%", "4%")
-	st.subheader("Road Image")
-	st.markdown("Real-time car-detection with road conditions under recording.")
-	placeholder = st.empty()
-	st.sidebar.markdown("# Frame")
+	if st.session_state.first_time:
+		with st.spinner('Initialization...'):
+			# Fetch system info at first run
+			cpu_percent = psutil.cpu_percent(1)
+			disk = psutil.disk_usage('/')
+			disk_usage = disk.used / disk.total 
+			mem = psutil.virtual_memory()
+			mem_usage = mem.used / mem.total
+			st.session_state.sys_info.append(cpu_percent)
+			st.session_state.sys_info.append(round(100*disk_usage,1))
+			st.session_state.sys_info.append(round(100*mem_usage,1))
+
+			# Fetch location
+			st.session_state.my_loc = get_loc()
+
+			# Fetch weather info
+			owm = pyowm.OWM('13396e2da2b93d0b4b2c526651854212')
+			place = "Qingdao"
+			mgr = owm.weather_manager()
+			obs = mgr.weather_at_place(place)
+			st.session_state.weather = obs.weather
+
+		st.balloons()
+
+	draw_gauges([col1,col2,col3])
+	draw_map(road_map, st.session_state.my_loc)
+	show_weather_data()
+	st.sidebar.markdown("# Replay the video")
 	side_bar = st.sidebar.empty()
-	selected_frame_index = 0
 
-	if st.session_state.rerun:
+	if st.session_state.first_time:
 		my_bar = side_bar.progress(0)
 		if (cap.isOpened()):
 			for i in range(61):
 				my_bar.progress(i)
 				ret, frame = cap.read() # (720, 1280, 3) mp4文件读进来是bgr
+				frame = cv2.resize(frame, dsize=(960, 540))
 				save_frame(frame)
-				placeholder.image(frame, caption=None, width=None, use_column_width=None, clamp=False, channels="BGR", output_format="auto")
+				road_image.image(frame, caption=None, width=None, use_column_width=True, clamp=True, channels="BGR", output_format="auto")
 		my_bar.empty()
-
-	# Avoid rerunning everything
-	st.session_state.rerun = False
 
 	selected_frame_index = side_bar.slider("Choose a frame (index)",
 											0, len(st.session_state.frames)-1, 
 											key="slider",
 											on_change=select_frame,
 											)
+	# draw_map(road_map, st.session_state.my_loc)
 
 	chart_data = pd.DataFrame(
-    	np.random.randint(0, 10, (60,3)),
-    	columns=['car', 'person', 'bike'])
+		np.random.randint(0, 10, (60,3)),
+		columns=['car', 'person', 'bike'])
 
-	st.subheader("Statistics")
+	st.subheader("Statistics 📈")
 	st.markdown("Something may useful.")
 	st.line_chart(chart_data, width=260, height=250)
+	st.write("😆😆 Enjoy yourself!!!")
+
+	# Avoid rerunning everything
+	st.session_state.first_time = False
 
 	if "cap" not in st.session_state:
 	# Store the cap accross reruns
@@ -211,68 +353,14 @@ def run_the_app():
 		while(True):
 			if not st.session_state.stop:
 				ret, frame = st.session_state.cap.read() # (720, 1280, 3) mp4文件读进来是bgr
+				frame = cv2.resize(frame, dsize=(960, 540))
 				save_frame(frame)
-				placeholder.image(frame, caption=None, width=None, use_column_width=None, clamp=False, channels="BGR", output_format="auto")
+				road_image.image(frame, caption=None, width=None, use_column_width=True, clamp=False, channels="BGR", output_format="auto")
 			else:
-				placeholder.image(st.session_state.frames[st.session_state.slider], 
+				road_image.image(st.session_state.frames[st.session_state.slider], 
 									caption=None, width=None, 
-									use_column_width=None, clamp=False, 
+									use_column_width=True, clamp=False, 
 									channels="BGR", output_format="auto")	
-
-
-	# print(stop)
-	# while (cap.isOpened()):
-	# 	if not stop:
-	# 		ret, frame = cap.read() # (720, 1280, 3) mp4文件读进来是bgr
-	# 		save_frame(frame)
-	# 	if 2 <= len(frames) <= 61 and not is_61:
-	# 		print(len(frames))
-	# 		selected_frame_index = side_bar.slider("Choose a frame (index)",
-	# 										0, len(frames)-1, len(frames)-1, 
-	# 										key=len(frames),
-	# 										)
-	# 		print(selected_frame_index)
-	# 		print("rerun here")
-	# 		if selected_frame_index != len(frames) - 1:
-	# 			print("good")
-	# 			stop = 1
-	# 			print(stop)
-	# 	if len(frames) == 61: # Stop generate more sliders
-	# 		is_61 = True
-	# 	placeholder.image(frames[selected_frame_index], caption=None, width=None, use_column_width=None, clamp=False, channels="BGR", output_format="auto")
-
-# This sidebar UI is a little search engine to find certain object types.
-def frame_selector_ui(summary, side_bar, key):
-
-
-	# # The user can pick which type of object to search for.
-	# object_type = st.sidebar.selectbox("Search for which objects?", summary.columns, 2)
-
-	# # The user can select a range for how many of the selected objecgt should be present.
-	# min_elts, max_elts = st.sidebar.slider("How many %ss (select a range)?" % object_type, 0, 25, [10, 20])
-	# selected_frames = get_selected_frames(summary, object_type, min_elts, max_elts)
-	# if len(selected_frames) < 1:
-	# 	return None, None
-
-	# # Choose a frame out of the selected frames.
-	# selected_frame_index = st.sidebar.slider("Choose a frame (index)", 0, len(selected_frames) - 1, 0)
-
-	# # Draw an altair chart in the sidebar with information on the frame.
-	objects_per_frame = summary.loc[selected_frames, object_type].reset_index(drop=True).reset_index()
-	chart = alt.Chart(objects_per_frame, height=120).mark_area().encode(
-		alt.X("index:Q", scale=alt.Scale(nice=False)),
-		alt.Y("%s:Q" % object_type))
-	selected_frame_df = pd.DataFrame({"selected_frame": [selected_frame_index]})
-	vline = alt.Chart(selected_frame_df).mark_rule(color="red").encode(x = "selected_frame")
-	st.sidebar.altair_chart(alt.layer(chart, vline))
-
-	# selected_frame = selected_frames[selected_frame_index]
-
-	selected_frame_index = side_bar.slider("Choose a frame (index)",
-											0, max(len(frames)-1, 1), max(len(frames)-1, 1), 
-											key=key)
-
-	return selected_frame_index
 
 # Select frames based on the selection in the sidebar
 @st.cache(hash_funcs={np.ufunc: str})
