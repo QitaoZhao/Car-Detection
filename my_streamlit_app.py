@@ -20,7 +20,6 @@ import streamlit as st
 import altair as alt
 import pandas as pd
 import numpy as np
-import pydeck as pdk
 from datetime import datetime, timedelta
 from streamlit_echarts import st_echarts
 import os, urllib, cv2, psutil, time, pyowm
@@ -45,10 +44,6 @@ def main():
 
 	# Render the readme as markdown using st.markdown.
 	readme_text = st.markdown(get_file_content_as_string("instructions.md"))
-
-	# Download external dependencies.
-	for filename in EXTERNAL_DEPENDENCIES.keys():
-		download_file(filename)
 
 	# Once we have the dependencies, add a selector for the app mode on the sidebar.
 	st.sidebar.title("What to do")
@@ -112,10 +107,7 @@ def run_the_app():
 
 		GMT_FORMAT = '%Y-%m-%d %H:%M:%S+00:00'
 		st.sidebar.title(f"📍 Weather at {place[0].upper()+place[1:]} currently: ")
-		if unit_c == 'celsius':
-			st.sidebar.write(f"### 🌡️ Temperature: {temperature} °C")
-		else:
-			st.sidebar.write(f"### 🌡️ Temperature: {temperature} F")
+		st.sidebar.write(f"### 🌡️ Temperature: {temperature} °C")
 		st.sidebar.write(f"### ☁️ Sky: {weather.detailed_status[0].upper()+weather.detailed_status[1:]}")
 		st.sidebar.write(f"### 🌪 Wind Speed: {round(weather.wind(unit='km_hour')['speed'])} km/h")
 		st.sidebar.write(f"### 🌅 Sunrise Time :     {datetime.strptime(weather.sunrise_time(timeformat='iso'), GMT_FORMAT)+timedelta(hours=8)}")
@@ -215,39 +207,6 @@ def run_the_app():
 		# lat, lon = my_loc
 		img = cv2.imread("./map.jpg")
 		road_map.image(img, caption=None, width=None, use_column_width=True, clamp=False, channels="RGB", output_format="auto")
-		# df = pd.DataFrame(
-		#     np.random.randn(1000, 2) / [50, 50] + my_loc,
-		#     columns=['lat', 'lon'])
-
-		# road_map.pydeck_chart(pdk.Deck(
-		#      map_style='mapbox://styles/mapbox/light-v9',
-		#      initial_view_state=pdk.ViewState(
-		#          latitude=lat,
-		#          longitude=lon,
-		#          zoom=11,
-		#          pitch=50,
-		#          height=394,
-		#      ),
-		#      layers=[
-		#          pdk.Layer(
-		#             'HexagonLayer',
-		#             data=df,
-		#             get_position='[lon, lat]',
-		#             radius=200,
-		#             elevation_scale=4,
-		#             elevation_range=[0, 1000],
-		#             pickable=True,
-		#             extruded=True,
-		#          ),
-		#          pdk.Layer(
-		#              'ScatterplotLayer',
-		#              data=df,
-		#              get_position='[lon, lat]',
-		#              get_color='[200, 30, 0, 160]',
-		#              get_radius=200,
-		#          ),
-		#      ],
-		#  ))
 
 	if "first_time" not in st.session_state:
 	# set the initial default value of the slider widget
@@ -258,16 +217,24 @@ def run_the_app():
 		st.session_state.sys_info = []
 
 	if "slider" not in st.session_state:
-	# set the initial default value of the slider widget
+	# Set the initial default value of the slider widget
 		st.session_state.slider = 60
 
 	if "my_loc" not in st.session_state:
-	# set the initial default value of the slider widget
+	# Set the location
 		st.session_state.my_loc = None
 
 	if "weather" not in st.session_state:
-	# set the initial default value of the slider widget
+	# Store weather conditions
 		st.session_state.weather = None
+
+	if "road_map" not in st.session_state:
+	# Store road_map placeholder
+		st.session_state.road_map = None
+
+	if "road_image" not in st.session_state:
+	# Store road_image placeholder
+		st.session_state.road_image = None
 
 	if "stop" not in st.session_state:
 		st.session_state.stop = False
@@ -275,18 +242,18 @@ def run_the_app():
 	if "frames" not in st.session_state:
 		st.session_state.frames = frames
 
-	cap = cv2.VideoCapture(video_path)
 	st.subheader("System Information Monitoring 🚗")
 	gauges = st.empty()
 	col1, col2, col3 = gauges.columns(3)
 	st.subheader("Road Map with Real-time Car-detection 🚦")
-	images = st.empty()
-	col_1, col_2 = images.columns([5,5])
-	road_map = col_1.empty()
-	road_image = col_2.empty()
+	col_1, col_2 = st.columns([5,5])
 
 	if st.session_state.first_time:
 		with st.spinner('Initialization...'):
+			# Initialize placeholders
+			st.session_state.road_map = col_1.empty()
+			st.session_state.road_image = col_2.empty()
+
 			# Fetch system info at first run
 			cpu_percent = psutil.cpu_percent(1)
 			disk = psutil.disk_usage('/')
@@ -298,7 +265,8 @@ def run_the_app():
 			st.session_state.sys_info.append(round(100*mem_usage,1))
 
 			# Fetch location
-			st.session_state.my_loc = get_loc()
+			# st.session_state.my_loc = get_loc()
+			st.session_state.my_loc = None
 
 			# Fetch weather info
 			owm = pyowm.OWM('13396e2da2b93d0b4b2c526651854212')
@@ -306,24 +274,24 @@ def run_the_app():
 			mgr = owm.weather_manager()
 			obs = mgr.weather_at_place(place)
 			st.session_state.weather = obs.weather
-
 		st.balloons()
 
 	draw_gauges([col1,col2,col3])
-	draw_map(road_map, st.session_state.my_loc)
+	draw_map(st.session_state.road_map, st.session_state.my_loc)
 	show_weather_data()
 	st.sidebar.markdown("# Replay the video")
 	side_bar = st.sidebar.empty()
 
 	if st.session_state.first_time:
 		my_bar = side_bar.progress(0)
+		cap = cv2.VideoCapture(video_path)
 		if (cap.isOpened()):
 			for i in range(61):
 				my_bar.progress(i)
 				ret, frame = cap.read() # (720, 1280, 3) mp4文件读进来是bgr
 				frame = cv2.resize(frame, dsize=(960, 540))
 				save_frame(frame)
-				road_image.image(frame, caption=None, width=None, use_column_width=True, clamp=True, channels="BGR", output_format="auto")
+				st.session_state.road_image.image(frame, caption=None, width=None, use_column_width=True, clamp=True, channels="BGR", output_format="auto")
 		my_bar.empty()
 
 	selected_frame_index = side_bar.slider("Choose a frame (index)",
@@ -331,7 +299,6 @@ def run_the_app():
 											key="slider",
 											on_change=select_frame,
 											)
-	# draw_map(road_map, st.session_state.my_loc)
 
 	chart_data = pd.DataFrame(
 		np.random.randint(0, 10, (60,3)),
@@ -341,8 +308,13 @@ def run_the_app():
 	st.markdown("Something may useful.")
 	st.line_chart(chart_data, width=260, height=250)
 	st.write("😆😆 Enjoy yourself!!!")
+	c = st.empty()
 
-	# Avoid rerunning everything
+	# for i in range(1, 30):
+	#     time.sleep(0.5) #just here so you can see the change
+	#     c.text(i)
+
+	# Avoid re-running everything
 	st.session_state.first_time = False
 
 	if "cap" not in st.session_state:
@@ -355,12 +327,13 @@ def run_the_app():
 				ret, frame = st.session_state.cap.read() # (720, 1280, 3) mp4文件读进来是bgr
 				frame = cv2.resize(frame, dsize=(960, 540))
 				save_frame(frame)
-				road_image.image(frame, caption=None, width=None, use_column_width=True, clamp=False, channels="BGR", output_format="auto")
+				st.session_state.road_image.image(frame, caption=None, width=None, use_column_width=True, clamp=False, channels="BGR", output_format="auto")
 			else:
-				road_image.image(st.session_state.frames[st.session_state.slider], 
+				st.session_state.road_image.image(st.session_state.frames[st.session_state.slider], 
 									caption=None, width=None, 
 									use_column_width=True, clamp=False, 
 									channels="BGR", output_format="auto")	
+				st.stop()		
 
 # Select frames based on the selection in the sidebar
 @st.cache(hash_funcs={np.ufunc: str})

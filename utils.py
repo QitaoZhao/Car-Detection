@@ -59,7 +59,8 @@ def map(location, zoom=10):
 # print(ip)
 # g = geocoder.arcgis(get_location(ip))
 # print(g.latlng)
-# data = map(g.latlng, 15)
+# # data = map(g.latlng, 15)
+# data = map([36.362695,120.692479], 15)
 
 # img = cv2.imread("./map.jpg")
 # print(img.shape)
