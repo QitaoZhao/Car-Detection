@@ -27,6 +27,7 @@ from utils import get_loc
 
 video_path = "test.mp4"
 frames = []
+result = {'detection_classes':['car', 'person'], 'detection_scores': [0.95, 0.98]}
 
 # Streamlit encourages well-structured code, like starting execution in a main() function.
 def main():
@@ -154,7 +155,6 @@ def run_the_app():
 					},
 					"radius":'100%', 
 					"itemStyle": {
-						# "color": '#58D9F9',
 						"color": '#D23D3B',
 						"shadowColor": 'rgba(206,104,104,0.45)',
 						"shadowBlur": 10,
@@ -236,6 +236,10 @@ def run_the_app():
 	# Store road_image placeholder
 		st.session_state.road_image = None
 
+	if "result_return" not in st.session_state:
+	# Store returned result placeholder
+		st.session_state.result_return = None
+
 	if "stop" not in st.session_state:
 		st.session_state.stop = False
 
@@ -281,8 +285,11 @@ def run_the_app():
 	show_weather_data()
 	st.sidebar.markdown("# Replay the video")
 	side_bar = st.sidebar.empty()
+	st.subheader("Statistics 📈")
+	st.markdown("Detection result.")
 
 	if st.session_state.first_time:
+		st.session_state.result_return = st.sidebar.empty()
 		my_bar = side_bar.progress(0)
 		cap = cv2.VideoCapture(video_path)
 		if (cap.isOpened()):
@@ -292,6 +299,7 @@ def run_the_app():
 				frame = cv2.resize(frame, dsize=(960, 540))
 				save_frame(frame)
 				st.session_state.road_image.image(frame, caption=None, width=None, use_column_width=True, clamp=True, channels="BGR", output_format="auto")
+				st.session_state.result_return.write(result)
 		my_bar.empty()
 
 	selected_frame_index = side_bar.slider("Choose a frame (index)",
@@ -304,8 +312,8 @@ def run_the_app():
 		np.random.randint(0, 10, (60,3)),
 		columns=['car', 'person', 'bike'])
 
-	st.subheader("Statistics 📈")
-	st.markdown("Something may useful.")
+	# st.subheader("Statistics 📈")
+	# st.markdown("Something may useful.")
 	st.line_chart(chart_data, width=260, height=250)
 	st.write("😆😆 Enjoy yourself!!!")
 	c = st.empty()
@@ -328,11 +336,13 @@ def run_the_app():
 				frame = cv2.resize(frame, dsize=(960, 540))
 				save_frame(frame)
 				st.session_state.road_image.image(frame, caption=None, width=None, use_column_width=True, clamp=False, channels="BGR", output_format="auto")
+				st.session_state.result_return.write(result)
 			else:
 				st.session_state.road_image.image(st.session_state.frames[st.session_state.slider], 
 									caption=None, width=None, 
 									use_column_width=True, clamp=False, 
 									channels="BGR", output_format="auto")	
+				st.session_state.result_return.write(result)
 				st.stop()		
 
 # Select frames based on the selection in the sidebar
