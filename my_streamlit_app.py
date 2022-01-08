@@ -25,7 +25,7 @@ from streamlit_echarts import st_echarts
 import os, urllib, cv2, psutil, time, pyowm
 from utils import get_loc
 
-video_path = "test.mp4"
+video_path = "test_2.mp4"
 frames = []
 result = {'detection_classes':['car', 'person'], 'detection_scores': [0.95, 0.98]}
 
@@ -333,7 +333,12 @@ def run_the_app():
 		while(True):
 			if not st.session_state.stop:
 				ret, frame = st.session_state.cap.read() # (720, 1280, 3) mp4文件读进来是bgr
-				frame = cv2.resize(frame, dsize=(960, 540))
+				try:
+					frame = cv2.resize(frame, dsize=(960, 540))
+				except cv2.error:
+					st.stop()
+				else:
+					pass
 				save_frame(frame)
 				st.session_state.road_image.image(frame, caption=None, width=None, use_column_width=True, clamp=False, channels="BGR", output_format="auto")
 				st.session_state.result_return.write(result)
