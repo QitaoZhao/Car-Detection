@@ -1,6 +1,8 @@
-# Self-driving Assistance System
+# Self-driving Assistance System with Car-detection
 
 Hi there! Welcome to our project.
+
+Our team members include *Haiqiao Hong*, *Hanbing Wang* and *Qitao Zhao*.
 
 This website is maintained by *Qitao* *Zhao*.
 
