@@ -1,19 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2018-2019 Streamlit Inc.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#    http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
-# This demo lets you explore the Udacity self-driving car image dataset.
+# Author: Qitao Zhao
 # More info: https://github.com/streamlit/demo-self-driving
 
 import cv2
@@ -364,41 +350,6 @@ def run_the_app():
 				st.stop()
 
 
-# Select frames based on the selection in the sidebar
-@st.cache(hash_funcs={np.ufunc: str})
-def get_selected_frames(summary, label, min_elts, max_elts):
-	return summary[np.logical_and(summary[label] >= min_elts, summary[label] <= max_elts)].index
-
-
-# This sidebar UI lets the user select parameters for the YOLO object detector.
-def object_detector_ui():
-	st.sidebar.markdown("# Model")
-	confidence_threshold = st.sidebar.slider("Confidence threshold", 0.0, 1.0, 0.5, 0.01)
-	overlap_threshold = st.sidebar.slider("Overlap threshold", 0.0, 1.0, 0.3, 0.01)
-	return confidence_threshold, overlap_threshold
-
-
-# Draws an image with boxes overlayed to indicate the presence of cars, pedestrians etc.
-def draw_image_with_boxes(image, boxes, header, description):
-	# Superpose the semi-transparent object detection boxes.    # Colors for the boxes
-	LABEL_COLORS = {
-		"car": [255, 0, 0],
-		"pedestrian": [0, 255, 0],
-		"truck": [0, 0, 255],
-		"trafficLight": [255, 255, 0],
-		"biker": [255, 0, 255],
-	}
-	image_with_boxes = image.astype(np.float64)
-	for _, (xmin, ymin, xmax, ymax, label) in boxes.iterrows():
-		image_with_boxes[int(ymin):int(ymax), int(xmin):int(xmax), :] += LABEL_COLORS[label]
-		image_with_boxes[int(ymin):int(ymax), int(xmin):int(xmax), :] /= 2
-
-	# Draw the header and image.
-	st.subheader(header)
-	st.markdown(description)
-	st.image(image_with_boxes.astype(np.uint8), use_column_width=True)
-
-
 # Download a single file and make its content available as a string.
 @st.cache(show_spinner=False)
 def get_file_content_as_string(path):
@@ -406,97 +357,6 @@ def get_file_content_as_string(path):
 	response = urllib.request.urlopen(url)
 	return response.read().decode("utf-8")
 
-
-# This function loads an image from Streamlit public repo on S3. We use st.cache on this
-# function as well, so we can reuse the images across runs.
-@st.cache(show_spinner=False)
-def load_image(url):
-	with urllib.request.urlopen(url) as response:
-		image = np.asarray(bytearray(response.read()), dtype="uint8")
-	image = cv2.imdecode(image, cv2.IMREAD_COLOR)
-	image = image[:, :, [2, 1, 0]]  # BGR -> RGB
-	return image
-
-
-# Run the YOLO model to detect objects.
-def yolo_v3(image, confidence_threshold, overlap_threshold):
-	# Load the network. Because this is cached it will only happen once.
-	@st.cache(allow_output_mutation=True)
-	def load_network(config_path, weights_path):
-		net = cv2.dnn.readNetFromDarknet(config_path, weights_path)
-		output_layer_names = net.getLayerNames()
-		output_layer_names = [output_layer_names[i[0] - 1] for i in net.getUnconnectedOutLayers()]
-		return net, output_layer_names
-
-	net, output_layer_names = load_network("yolov3.cfg", "yolov3.weights")
-
-	# Run the YOLO neural net.
-	blob = cv2.dnn.blobFromImage(image, 1 / 255.0, (416, 416), swapRB=True, crop=False)
-	net.setInput(blob)
-	layer_outputs = net.forward(output_layer_names)
-
-	# Supress detections in case of too low confidence or too much overlap.
-	boxes, confidences, class_IDs = [], [], []
-	H, W = image.shape[:2]
-	for output in layer_outputs:
-		for detection in output:
-			scores = detection[5:]
-			classID = np.argmax(scores)
-			confidence = scores[classID]
-			if confidence > confidence_threshold:
-				box = detection[0:4] * np.array([W, H, W, H])
-				centerX, centerY, width, height = box.astype("int")
-				x, y = int(centerX - (width / 2)), int(centerY - (height / 2))
-				boxes.append([x, y, int(width), int(height)])
-				confidences.append(float(confidence))
-				class_IDs.append(classID)
-	indices = cv2.dnn.NMSBoxes(boxes, confidences, confidence_threshold, overlap_threshold)
-
-	# Map from YOLO labels to Udacity labels.
-	UDACITY_LABELS = {
-		0: 'pedestrian',
-		1: 'biker',
-		2: 'car',
-		3: 'biker',
-		5: 'truck',
-		7: 'truck',
-		9: 'trafficLight'
-	}
-	xmin, xmax, ymin, ymax, labels = [], [], [], [], []
-	if len(indices) > 0:
-		# loop over the indexes we are keeping
-		for i in indices.flatten():
-			label = UDACITY_LABELS.get(class_IDs[i], None)
-			if label is None:
-				continue
-
-			# extract the bounding box coordinates
-			x, y, w, h = boxes[i][0], boxes[i][1], boxes[i][2], boxes[i][3]
-
-			xmin.append(x)
-			ymin.append(y)
-			xmax.append(x + w)
-			ymax.append(y + h)
-			labels.append(label)
-
-	boxes = pd.DataFrame({"xmin": xmin, "ymin": ymin, "xmax": xmax, "ymax": ymax, "labels": labels})
-	return boxes[["xmin", "ymin", "xmax", "ymax", "labels"]]
-
-
-# Path to the Streamlit public S3 bucket
-DATA_URL_ROOT = "https://streamlit-self-driving.s3-us-west-2.amazonaws.com/"
-
-# External files to download.
-EXTERNAL_DEPENDENCIES = {
-	"yolov3.weights": {
-		"url": "https://pjreddie.com/media/files/yolov3.weights",
-		"size": 248007048
-	},
-	"yolov3.cfg": {
-		"url": "https://raw.githubusercontent.com/pjreddie/darknet/master/cfg/yolov3.cfg",
-		"size": 8342
-	}
-}
 
 if __name__ == "__main__":
 	main()
